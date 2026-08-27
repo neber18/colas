@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fila de Artistas Callejeros — Cola FIFO</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --night: #12172a;
+    --panel: #1c2340;
+    --panel-2: #232b4d;
+    --amber: #f5a623;
+    --amber-dim: #a86f1c;
+    --paper: #f6efdd;
+    --rose: #e8497a;
+    --text: #eef0fb;
+    --muted: #9aa1c4;
+    --line: #333c66;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0;
+    background: radial-gradient(ellipse at 50% -10%, #202a52 0%, var(--night) 55%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100%;
+  }
+
+  .wrap{
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 24px 64px;
+  }
+
+  .eyebrow{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+
+  h1{
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: clamp(28px, 5vw, 44px);
+    line-height: 1.05;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .sub{
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 56ch;
+    margin: 0 0 36px;
+  }
+
+  .sub strong{ color: var(--text); font-weight: 600; }
+
+  /* ---------- ESCENARIO ---------- */
+  .stage{
+    position: relative;
+    background: linear-gradient(180deg, var(--panel) 0%, #161b36 100%);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 46px 24px 34px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .stage::before{
+    content:"";
+    position:absolute; inset: 0;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 38px, rgba(245,166,35,0.05) 38px 39px);
+    pointer-events:none;
+  }
+
+  .spotlight-ring{
+    width: 168px; height: 168px;
+    border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    position: relative;
+    background: radial-gradient(circle, rgba(245,166,35,0.22) 0%, rgba(245,166,35,0.04) 62%, transparent 72%);
+    margin-bottom: 18px;
+  }
+
+  .spotlight-ring::after{
+    content:"";
+    position:absolute; inset:0;
+    border-radius: 50%;
+    border: 2px dashed var(--amber-dim);
+    animation: spin 22s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .spotlight-ring::after{ animation: none; }
+  }
+
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .performer-core{
+    width: 108px; height: 108px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    text-align:center;
+    font-size: 34px;
+  }
+
+  .performer-core.active{
+    background: radial-gradient(circle at 40% 35%, #ffd58a, var(--amber) 60%);
+    box-shadow: 0 0 34px 6px rgba(245,166,35,0.45);
+  }
+
+  .now-name{
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    margin: 4px 0 2px;
+  }
+
+  .now-role{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--amber);
+    letter-spacing: 0.04em;
+  }
+
+  .now-empty{
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .now-empty .btn{ margin-top: 14px; }
+
+  /* ---------- FILA DE TICKETS ---------- */
+  .queue-label{
+    display:flex; align-items:center; justify-content: space-between;
+    margin: 4px 0 12px;
+  }
+
+  .queue-label span:first-child{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .queue-count{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--amber);
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+
+  .rail{
+    display:flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding: 6px 2px 16px;
+    min-height: 118px;
+  }
+
+  .rail::-webkit-scrollbar{ height: 6px; }
+  .rail::-webkit-scrollbar-thumb{ background: var(--line); border-radius: 4px; }
+
+  .ticket{
+    flex: 0 0 auto;
+    width: 148px;
+    background: var(--paper);
+    color: #2a2416;
+    border-radius: 10px;
+    padding: 12px 12px 10px;
+    position: relative;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+    animation: dropIn 0.32s ease;
+  }
+
+  @keyframes dropIn{
+    from{ opacity:0; transform: translateY(-10px) rotate(-2deg); }
+    to{ opacity:1; transform: translateY(0) rotate(0); }
+  }
+
+  .ticket::before, .ticket::after{
+    content:"";
+    position:absolute;
+    width: 12px; height: 12px;
+    background: var(--panel);
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .ticket::before{ left: -6px; }
+  .ticket::after{ right: -6px; }
+
+  .ticket .num{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--rose);
+    font-weight: 500;
+  }
+
+  .ticket .name{
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    margin: 3px 0 1px;
+  }
+
+  .ticket .role{
+    font-size: 11.5px;
+    color: #5c5136;
+  }
+
+  .empty-rail{
+    color: var(--muted);
+    font-size: 13.5px;
+    padding: 40px 4px;
+    width: 100%;
+    text-align: center;
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+  }
+
+  /* ---------- CONTROLES ---------- */
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 22px 22px 24px;
+  }
+
+  .panel h2{
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 16px;
+    margin: 0 0 14px;
+  }
+
+  .form-row{
+    display:flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  input[type=text], select{
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    flex: 1 1 160px;
+  }
+
+  input[type=text]::placeholder{ color: var(--muted); }
+
+  input:focus-visible, select:focus-visible, button:focus-visible{
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+
+  .actions{ display:flex; gap: 10px; flex-wrap: wrap; }
+
+  .btn{
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 10px 16px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease;
+  }
+
+  .btn:active{ transform: scale(0.97); }
+
+  .btn-primary{
+    background: var(--amber);
+    color: #241804;
+  }
+  .btn-primary:hover{ filter: brightness(1.08); }
+
+  .btn-ghost{
+    background: transparent;
+    color: var(--text);
+    border-color: var(--line);
+  }
+  .btn-ghost:hover{ background: var(--panel-2); }
+
+  .btn:disabled{
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .footnote{
+    margin-top: 26px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+    line-height: 1.6;
+  }
+
+  .footnote code{
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--panel-2);
+    padding: 1px 6px;
+    border-radius: 5px;
+    color: var(--amber);
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="eyebrow">Plaza Mayor · Turnos en vivo</p>
+  <h1>La fila de los artistas callejeros</h1>
+  <p class="sub">Cada artista se anota al llegar y espera su turno para ocupar el foco del escenario.
+    <strong>El primero en llegar es el primero en salir</strong> — así funciona una cola FIFO.</p>
+
+  <div class="stage">
+    <div class="spotlight-ring">
+      <div class="performer-core" id="performerCore">🎭</div>
+    </div>
+    <div id="nowInfo" style="text-align:center;">
+      <p class="now-empty">Escenario libre — nadie se ha presentado todavía</p>
+    </div>
+  </div>
+
+  <div class="queue-label">
+    <span>Fila de espera</span>
+    <span class="queue-count" id="queueCount">0 esperando</span>
+  </div>
+  <div class="rail" id="rail">
+    <div class="empty-rail">Aún no hay artistas anotados. Agrega uno abajo 👇</div>
+  </div>
+
+  <div class="panel">
+    <h2>Anotarse en la fila</h2>
+    <div class="form-row">
+      <input type="text" id="nameInput" placeholder="Nombre del artista" />
+      <select id="roleSelect">
+        <option>Malabares con fuego</option>
+        <option>Mimo</option>
+        <option>Estatua viviente</option>
+        <option>Guitarra flamenca</option>
+        <option>Escapista</option>
+        <option>Funambulista</option>
+        <option>Zanquero</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="enqueueBtn">Anotarse (encolar)</button>
+      <button class="btn btn-ghost" id="dequeueBtn">Llamar al siguiente (desencolar)</button>
+      <button class="btn btn-ghost" id="resetBtn">Reiniciar</button>
+    </div>
+  </div>
+
+  <p class="footnote">
+    Bajo el capó: cada tarjeta se agrega al final del arreglo con <code>push()</code> — encolar —
+    y el organizador llama siempre al elemento del frente con <code>shift()</code> — desencolar.
+    Nadie se salta el turno; el orden de llegada define el orden de salida.
+  </p>
+</div>
+
+<script>
+  // ------- Estructura de datos: Cola (FIFO) -------
+  class Cola {
+    constructor(){ this.items = []; }
+    encolar(item){ this.items.push(item); }
+    desencolar(){ return this.items.shift(); }
+    estaVacia(){ return this.items.length === 0; }
+    tamano(){ return this.items.length; }
+  }
+
+  const cola = new Cola();
+  let ticketNum = 0;
+  let currentPerformer = null;
+
+  const rail = document.getElementById('rail');
+  const queueCount = document.getElementById('queueCount');
+  const nowInfo = document.getElementById('nowInfo');
+  const performerCore = document.getElementById('performerCore');
+  const nameInput = document.getElementById('nameInput');
+  const roleSelect = document.getElementById('roleSelect');
+
+  const roleEmoji = {
+    'Malabares con fuego': '🔥',
+    'Mimo': '🎭',
+    'Estatua viviente': '🗿',
+    'Guitarra flamenca': '🎸',
+    'Escapista': '🔓',
+    'Funambulista': '🎪',
+    'Zanquero': '🦵',
+  };
+
+  function render(){
+    // Fila de tickets
+    rail.innerHTML = '';
+    if (cola.estaVacia()){
+      rail.innerHTML = '<div class="empty-rail">No hay nadie esperando ahora mismo.</div>';
+    } else {
+      cola.items.forEach((artista) => {
+        const t = document.createElement('div');
+        t.className = 'ticket';
+        t.innerHTML = `
+          <div class="num">TURNO #${artista.num}</div>
+          <div class="name">${artista.nombre}</div>
+          <div class="role">${artista.disciplina}</div>
+        `;
+        rail.appendChild(t);
+      });
+    }
+    queueCount.textContent = `${cola.tamano()} esperando`;
+
+    // Escenario
+    if (currentPerformer){
+      performerCore.classList.add('active');
+      performerCore.textContent = roleEmoji[currentPerformer.disciplina] || '🎤';
+      nowInfo.innerHTML = `
+        <p class="now-name">${currentPerformer.nombre}</p>
+        <p class="now-role">${currentPerformer.disciplina.toUpperCase()}</p>
+      `;
+    } else {
+      performerCore.classList.remove('active');
+      performerCore.textContent = '🎭';
+      nowInfo.innerHTML = `<p class="now-empty">Escenario libre — llama al siguiente artista</p>`;
+    }
+  }
+
+  document.getElementById('enqueueBtn').addEventListener('click', () => {
+    const nombre = nameInput.value.trim() || `Artista ${++ticketNum}`;
+    const disciplina = roleSelect.value;
+    ticketNum += 1;
+    cola.encolar({ nombre, disciplina, num: ticketNum });
+    nameInput.value = '';
+    render();
+  });
+
+  document.getElementById('dequeueBtn').addEventListener('click', () => {
+    if (cola.estaVacia()) return;
+    currentPerformer = cola.desencolar();
+    render();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    cola.items.length = 0;
+    currentPerformer = null;
+    ticketNum = 0;
+    render();
+  });
+
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('enqueueBtn').click();
+  });
+
+  render();
+</script>
+
+</body>
+</html>

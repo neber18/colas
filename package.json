@@ -1,0 +1,21 @@
+{
+  "name": "cola-artistas-callejeros",
+  "version": "1.0.0",
+  "description": "Caso de estudio: manejo de colas (FIFO) aplicado a una fila de artistas callejeros en una plaza publica",
+  "main": "cola-artistas-callejeros.js",
+  "scripts": {
+    "build": "tsc cola-artistas-callejeros.ts --ignoreConfig",
+    "start": "node cola-artistas-callejeros.js"
+  },
+  "keywords": [
+    "typescript",
+    "colas",
+    "fifo",
+    "poo"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
